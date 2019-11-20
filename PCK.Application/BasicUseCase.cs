@@ -6,7 +6,7 @@ namespace PCK.Application
     public class BasicUseCase
     {
         private readonly List<Core.Common.Product> products = new List<Core.Common.Product>();
-        private readonly decimal discount;
+        private decimal discount;
 
         public BasicUseCase()
         {
@@ -21,9 +21,14 @@ namespace PCK.Application
         {
             var product = products.First(x => x.UPC.Item == id);
 
-            var result = Core.Common.calculate(product, Core.Common.Tax.NewTax(Core.DecimalTwoDigits.create(taxValue)), Core.Common.Discount.NewDiscount(Core.DecimalTwoDigits.create(discount)));
+            var result = Core.Common.calculate(product, Core.Common.Tax.NewTax(Core.DecimalTwoDigits.create(taxValue)), discount == 0 ? Core.Common.Discount.NoDiscount : Core.Common.Discount.NewDiscount(Core.DecimalTwoDigits.create(discount)));
 
             return new Result(Core.DecimalTwoDigits.value(product.Price), Core.DecimalTwoDigits.value(result.CalculatedPrice), taxValue, discount, result.TaxAmount, result.DiscountAmount);
+        }
+
+        public void SetDiscount(decimal discount)
+        {
+            this.discount = discount;
         }
     }
 
@@ -48,7 +53,15 @@ namespace PCK.Application
 
         public override string ToString()
         {
-            return $"Product price reported as ${InitPrice} before tax and ${CalculatedPrice.ToString("0.00")} after {TaxValue} % tax and {DiscountValue} % discount. Tax amount: ${TaxValueAmount}, discount amount: ${DiscountValueAmount}";
+            var discountValueText = string.Empty;
+            var discountAmountText = string.Empty;
+            if (DiscountValue != 0)
+            {
+                discountValueText = $" and {DiscountValue} % discount";
+                discountAmountText = $", discount amount: ${DiscountValueAmount}";
+            }
+
+            return $"Product price reported as ${InitPrice} before tax and ${CalculatedPrice.ToString("0.00")} after {TaxValue} % tax{discountValueText}. Tax amount: ${TaxValueAmount}{discountAmountText}.";
         }
     }
 }
