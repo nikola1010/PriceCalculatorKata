@@ -24,8 +24,8 @@ module Common =
         DiscountAmount : decimal
     }
 
-    let calculate : Product -> Tax -> Discount -> Result =
-        fun product tax discount ->
+    let calculate : Product -> Tax -> Discount -> Discount -> Result =
+        fun product tax discount upcDiscount ->
         let priceValue = DecimalTwoDigits.value product.Price
         let (Tax taxV) = tax
         let taxValue = DecimalTwoDigits.value taxV
@@ -33,8 +33,12 @@ module Common =
             match discount with
                 | NoDiscount -> 0M
                 | Discount d -> DecimalTwoDigits.value d
+        let upcDiscountValue =
+            match upcDiscount with
+            | NoDiscount -> 0M
+            | Discount d -> DecimalTwoDigits.value d
         let taxAmountTD = DecimalTwoDigits.create(priceValue * taxValue / 100M)
-        let discountAmountTD = DecimalTwoDigits.create(priceValue * discountValue / 100M)
+        let discountAmountTD = DecimalTwoDigits.create(priceValue * discountValue / 100M + priceValue * upcDiscountValue / 100M)
         let taxAmount = DecimalTwoDigits.value taxAmountTD
         let discountAmount = DecimalTwoDigits.value discountAmountTD
         { CalculatedPrice = DecimalTwoDigits.create (priceValue + taxAmount - discountAmount)
