@@ -2,14 +2,6 @@
 
 module Common =
 
-    //type DecimalTwoDigits = DecimalTwoDigits of decimal
-    //let create (value:decimal) = 
-    //    let integralValue = truncate value
-    //    let fraction = value - integralValue
-    //    let truncatedFraction = truncate (fraction * 100M) / 100M
-    //    DecimalTwoDigits (integralValue + truncatedFraction)
-    ////let apply f (DecimalTwoDigits d) = f d
-    ////let value d = apply id d
     open DecimalTwoDigits
     
     type UPC = UPC of int
@@ -21,19 +13,29 @@ module Common =
         Price: DecimalTwoDigits
     }
 
-    type Tax = Tax of decimal
+    type Tax = Tax of DecimalTwoDigits
+    type Discount = Discount of DecimalTwoDigits
 
     type Result = {
-        InitialPrice : DecimalTwoDigits
         CalculatedPrice : DecimalTwoDigits
-        Tax : Tax
+        TaxAmount : decimal
+        DiscountAmount : decimal
     }
 
-    let calculate : Product -> Tax -> DecimalTwoDigits =
-        fun product tax ->
+    let calculate : Product -> Tax -> Discount -> Result =
+        fun product tax discount ->
         let priceValue = DecimalTwoDigits.value product.Price
-        let (Tax taxValue) = tax
-        DecimalTwoDigits.create (priceValue + priceValue * taxValue / 100M)
+        let (Tax taxV) = tax
+        let taxValue = DecimalTwoDigits.value taxV
+        let (Discount discountV) = discount
+        let discountValue = DecimalTwoDigits.value discountV
+        let taxAmountTD = DecimalTwoDigits.create(priceValue * taxValue / 100M)
+        let discountAmountTD = DecimalTwoDigits.create(priceValue * discountValue / 100M)
+        let taxAmount = DecimalTwoDigits.value taxAmountTD
+        let discountAmount = DecimalTwoDigits.value discountAmountTD
+        { CalculatedPrice = DecimalTwoDigits.create (priceValue + taxAmount - discountAmount)
+          TaxAmount = taxAmount
+          DiscountAmount = discountAmount }
 
 
 

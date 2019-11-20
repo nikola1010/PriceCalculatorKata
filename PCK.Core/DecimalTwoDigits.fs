@@ -1,12 +1,10 @@
 ﻿namespace PCK.Core
 
 module DecimalTwoDigits =
+    open System
 
     type DecimalTwoDigits = private DecimalTwoDigits of decimal
     let create (value:decimal) = 
-        let integralValue = truncate value
-        let fraction = value - integralValue
-        let truncatedFraction = truncate (fraction * 100M) / 100M
-        DecimalTwoDigits (integralValue + truncatedFraction)
+        DecimalTwoDigits (Math.Round(value,2))
     let private apply f (DecimalTwoDigits d) = f d
     let value d = apply id d
