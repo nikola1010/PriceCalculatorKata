@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.2</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="DecimalTwoDigits.fs" />
+    <Compile Include="Common.fs" />
+  </ItemGroup>
+
+</Project>
