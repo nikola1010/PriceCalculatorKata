@@ -1,4 +1,5 @@
 ﻿using Microsoft.FSharp.Collections;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -9,6 +10,7 @@ namespace PCK.Application
         private readonly List<Core.Common.Product> products = new List<Core.Common.Product>();
         private Discount discount;
         private Dictionary<int, Discount> productUpcDiscounts = new Dictionary<int, Discount>();
+        private DiscountCup discountCup;
 
         public BasicUseCase()
         {
@@ -19,6 +21,8 @@ namespace PCK.Application
 
         public Result Execute(int id, decimal taxValue, List<AdditionalCost> additionalCosts, CombiningDiscountsMethod combiningDiscountsMethod)
         {
+            if (discountCup == null) throw new ArgumentNullException(nameof(discountCup));
+
             var product = products.First(x => x.UPC.Item == id);
             Discount upcDiscount;
             productUpcDiscounts.TryGetValue(id, out upcDiscount);
@@ -32,9 +36,16 @@ namespace PCK.Application
                                                 ListModule.OfSeq(additionalCosts.Select(ac => new Core.Common.AdditionalCost(ac.Description,
                                                                                                                                 ac.Type == AdditionalCostType.Absolute ? Core.Common.Ammount.NewAbsoluteValue(Core.DecimalTwoDigits.create(ac.Value)) :
                                                                                                                                                                             Core.Common.Ammount.NewPercentage(ac.Value)))),
-                                                combiningDiscountsMethod == CombiningDiscountsMethod.Additive ? Core.Common.CombiningDiscountsMethod.Additive : Core.Common.CombiningDiscountsMethod.Multiplicative);
+                                                combiningDiscountsMethod == CombiningDiscountsMethod.Additive ? Core.Common.CombiningDiscountsMethod.Additive : Core.Common.CombiningDiscountsMethod.Multiplicative,
+                                                discountCup.Type == DiscountCupType.Absolute ? Core.Common.DiscountCap.NewAbsoluteValueCup(Core.DecimalTwoDigits.create(discountCup.Value)) :
+                                                                                                            Core.Common.DiscountCap.NewPercentageCup(discountCup.Value));
 
             return new Result(Core.DecimalTwoDigits.value(product.Price), Core.DecimalTwoDigits.value(result.CalculatedPrice), taxValue, discount, result.TaxAmount, result.DiscountAmount, upcDiscount, result.AdditionalCostsResult.Select(ac => new AdditionalCostResult(ac.Description, Core.DecimalTwoDigits.value(ac.Ammount))));
+        }
+
+        public void SetDiscountCup(DiscountCup discountCup)
+        {
+            this.discountCup = discountCup;
         }
 
         public void SetDiscount(Discount discount)
@@ -69,6 +80,24 @@ namespace PCK.Application
     {
         Additive,
         Multiplicative
+    }
+
+    public enum DiscountCupType
+    {
+        Absolute,
+        Percentage
+    }
+
+    public class DiscountCup
+    {
+        public DiscountCup(DiscountCupType type, decimal value)
+        {
+            Type = type;
+            Value = value;
+        }
+
+        public DiscountCupType Type { get; }
+        public decimal Value { get; }
     }
 
     public class AdditionalCost
@@ -140,7 +169,7 @@ namespace PCK.Application
             if (DiscountValue != null)
             {
                 discountValueText = $" and {DiscountValue.Value} % ({DiscountValue.Rule}) discount";
-                discountAmountText = $", discount amount: ${DiscountValueAmount}";
+                discountAmountText = $", discount amount: ${DiscountValueAmount.ToString("0.00")}";
             }
 
             if (UpcDiscountValue != null)

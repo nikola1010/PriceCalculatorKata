@@ -8,17 +8,30 @@ namespace PCK.Client
     {
         static void Main(string[] args)
         {
-            BasicUseCase buc = new BasicUseCase();
+            try
+            {
+                BasicUseCase buc = new BasicUseCase();
 
-            buc.SetDiscount(new Discount(15, DiscountRule.After));
-            buc.SetUPCDiscount(12345, new Discount(7, DiscountRule.After));
-            var additionalCosts = new List<AdditionalCost>() { new AdditionalCost("Packaging", AdditionalCostType.Percentage, 1), new AdditionalCost("Transport", AdditionalCostType.Absolute, 2.2M) };
-            var result = buc.Execute(12345, 21M, additionalCosts, CombiningDiscountsMethod.Additive);
+                buc.SetDiscount(new Discount(15, DiscountRule.After));
+                buc.SetUPCDiscount(12345, new Discount(7, DiscountRule.After));
+                buc.SetDiscountCup(new DiscountCup(DiscountCupType.Percentage, 20));
+                var additionalCosts = new List<AdditionalCost>();
+                var result = buc.Execute(12345, 21M, additionalCosts, CombiningDiscountsMethod.Additive);
 
-            var result2 = buc.Execute(12345, 21M, additionalCosts, CombiningDiscountsMethod.Multiplicative);
+                buc.SetDiscountCup(new DiscountCup(DiscountCupType.Absolute, 4));
+                var result2 = buc.Execute(12345, 21M, additionalCosts, CombiningDiscountsMethod.Additive);
 
-            Console.WriteLine(result);
-            Console.WriteLine(result2);
+                buc.SetDiscountCup(new DiscountCup(DiscountCupType.Percentage, 30));
+                var result3 = buc.Execute(12345, 21M, additionalCosts, CombiningDiscountsMethod.Additive);
+
+                Console.WriteLine(result);
+                Console.WriteLine(result2);
+                Console.WriteLine(result3);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
 
             Console.ReadKey();
         }

@@ -44,6 +44,10 @@ module Common =
     type CombiningDiscountsMethod =
     | Additive
     | Multiplicative
+    
+    type DiscountCap =
+    | AbsoluteValueCup of DecimalTwoDigits
+    | PercentageCup of decimal
 
     type Result = {
         CalculatedPrice : DecimalTwoDigits
@@ -95,8 +99,8 @@ module Common =
                             | Additive -> currentPrice
                             | Multiplicative -> currentPrice - currentDiscountValue
 
-    let calculate : Product -> Tax -> Discount -> Discount -> AdditionalCost list -> CombiningDiscountsMethod-> Result =
-        fun product (Tax tax) discount upcDiscount additionalCosts combiningDiscountsMethod ->
+    let calculate : Product -> Tax -> Discount -> Discount -> AdditionalCost list -> CombiningDiscountsMethod -> DiscountCap -> Result =
+        fun product (Tax tax) discount upcDiscount additionalCosts combiningDiscountsMethod discountCap ->
         let priceValue = DecimalTwoDigits.value product.Price
         let taxValue = DecimalTwoDigits.value tax
 
@@ -111,7 +115,13 @@ module Common =
 
         let discountValue = discountAmountRulesBefore + discountAmountRulesAfter
         let taxAmountTD = DecimalTwoDigits.create(currentPriceValue * taxValue / 100M)
-        let discountAmountTD = DecimalTwoDigits.create(discountValue)
+         
+        let discountCapValue = 
+            match discountCap with
+            | PercentageCup pc -> pc * priceValue / 100M
+            | AbsoluteValueCup avc -> DecimalTwoDigits.value avc
+        
+        let discountAmountTD = DecimalTwoDigits.create(min discountValue discountCapValue)
         let taxAmount = DecimalTwoDigits.value taxAmountTD
         let discountAmount = DecimalTwoDigits.value discountAmountTD
         let totalAdditionalCosts = additionalCosts |> List.map(fun ac -> calculateAdditionalCost product.Price ac)
