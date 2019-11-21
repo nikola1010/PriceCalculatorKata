@@ -18,11 +18,11 @@ module Common =
     | After
 
     type DiscountValue ={
-        Value: DecimalTwoDigits
+        Value: decimal
         ApplyRule: DiscountApplyRule
     }
 
-    type Tax = Tax of DecimalTwoDigits
+    type Tax = Tax of decimal
     type Discount =
     | Discount of DiscountValue
     | NoDiscount
@@ -60,7 +60,7 @@ module Common =
         fun price discounts ->
         discounts |> List.fold(fun result discount -> result + match discount with
                                                                         | NoDiscount -> 0M
-                                                                        | Discount d -> DecimalTwoDigits.value d.Value * price / 100M) 0M
+                                                                        | Discount d -> d.Value * price / 100M) 0M
 
     let private calculateAdditionalCost : DecimalTwoDigits -> AdditionalCost -> AdditionalCostResult =
         fun prpductPrice additionalCost ->
@@ -100,9 +100,8 @@ module Common =
                             | Multiplicative -> currentPrice - currentDiscountValue
 
     let calculate : Product -> Tax -> Discount -> Discount -> AdditionalCost list -> CombiningDiscountsMethod -> DiscountCap -> Result =
-        fun product (Tax tax) discount upcDiscount additionalCosts combiningDiscountsMethod discountCap ->
+        fun product (Tax taxValue) discount upcDiscount additionalCosts combiningDiscountsMethod discountCap ->
         let priceValue = DecimalTwoDigits.value product.Price
-        let taxValue = DecimalTwoDigits.value tax
 
         let beforeRuleDiscountAmmount = calculateDiscountAmount priceValue ([discount] |> List.filter matchDiscountApplyRuleBefore)
         let beforeRuleUpcDiscountAmmount = calculateDiscountAmount (getPriceByCombiningDiscountsMethod combiningDiscountsMethod priceValue beforeRuleDiscountAmmount) ([upcDiscount] |> List.filter matchDiscountApplyRuleBefore)

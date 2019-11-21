@@ -28,11 +28,11 @@ namespace PCK.Application
             productUpcDiscounts.TryGetValue(id, out upcDiscount);
 
             var result = Core.Common.calculate(product,
-                                                Core.Common.Tax.NewTax(Core.DecimalTwoDigits.create(taxValue)),
+                                                Core.Common.Tax.NewTax(taxValue),
                                                 discount == null ? Core.Common.Discount.NoDiscount :
-                                                                Core.Common.Discount.NewDiscount(new Core.Common.DiscountValue(Core.DecimalTwoDigits.create(discount.Value), discount.Rule == DiscountRule.After ? Core.Common.DiscountApplyRule.After : Core.Common.DiscountApplyRule.Before)),
+                                                                Core.Common.Discount.NewDiscount(new Core.Common.DiscountValue(discount.Value, discount.Rule == DiscountRule.After ? Core.Common.DiscountApplyRule.After : Core.Common.DiscountApplyRule.Before)),
                                                 upcDiscount == null ? Core.Common.Discount.NoDiscount :
-                                                                    Core.Common.Discount.NewDiscount(new Core.Common.DiscountValue(Core.DecimalTwoDigits.create(upcDiscount.Value), upcDiscount.Rule == DiscountRule.After ? Core.Common.DiscountApplyRule.After : Core.Common.DiscountApplyRule.Before)),
+                                                                    Core.Common.Discount.NewDiscount(new Core.Common.DiscountValue(upcDiscount.Value, upcDiscount.Rule == DiscountRule.After ? Core.Common.DiscountApplyRule.After : Core.Common.DiscountApplyRule.Before)),
                                                 ListModule.OfSeq(additionalCosts.Select(ac => new Core.Common.AdditionalCost(ac.Description,
                                                                                                                                 ac.Type == AdditionalCostType.Absolute ? Core.Common.Ammount.NewAbsoluteValue(Core.DecimalTwoDigits.create(ac.Value)) :
                                                                                                                                                                             Core.Common.Ammount.NewPercentage(ac.Value)))),
