@@ -26,11 +26,26 @@ module Common =
     type Discount =
     | Discount of DiscountValue
     | NoDiscount
+    
+    type Ammount =
+    | AbsoluteValue of DecimalTwoDigits
+    | Percentage of decimal
+
+    type AdditionalCost = {
+        Description : string
+        Ammount : Ammount
+    }
+
+    type AdditionalCostResult = {
+        Description : string
+        Ammount : DecimalTwoDigits
+    }
 
     type Result = {
         CalculatedPrice : DecimalTwoDigits
         TaxAmount : decimal
         DiscountAmount : decimal
+        AdditionalCostsResult : AdditionalCostResult list
     }
 
     let private calculateDiscountAmount : decimal -> Discount list -> decimal = 
@@ -39,8 +54,21 @@ module Common =
                                                                         | NoDiscount -> 0M
                                                                         | Discount d -> DecimalTwoDigits.value d.Value * price / 100M) 0M
 
-    let calculate : Product -> Tax -> Discount -> Discount -> Result =
-        fun product tax discount upcDiscount ->
+    let private calculateAdditionalCost : DecimalTwoDigits -> AdditionalCost -> AdditionalCostResult =
+        fun prpductPrice additionalCost ->
+        match additionalCost.Ammount with
+        | AbsoluteValue av -> {
+                                Description = additionalCost.Description
+                                Ammount = av
+                              }
+        | Percentage p -> let priceValue = DecimalTwoDigits.value prpductPrice
+                          {
+                            Description = additionalCost.Description
+                            Ammount = DecimalTwoDigits.create (priceValue * p / 100M)
+                          }
+
+    let calculate : Product -> Tax -> Discount -> Discount -> AdditionalCost list -> Result =
+        fun product tax discount upcDiscount additionalCosts ->
         let priceValue = DecimalTwoDigits.value product.Price
         let (Tax taxV) = tax
         let taxValue = DecimalTwoDigits.value taxV
@@ -64,9 +92,11 @@ module Common =
         let discountAmountTD = DecimalTwoDigits.create(discountValue)
         let taxAmount = DecimalTwoDigits.value taxAmountTD
         let discountAmount = DecimalTwoDigits.value discountAmountTD
-        { CalculatedPrice = DecimalTwoDigits.create (priceValue + taxAmount - discountAmount)
+        let totalAdditionalCosts = additionalCosts |> List.map(fun ac -> calculateAdditionalCost product.Price ac)
+        { CalculatedPrice = DecimalTwoDigits.create (priceValue + taxAmount - discountAmount + (totalAdditionalCosts |> List.sumBy(fun c -> DecimalTwoDigits.value c.Ammount)))
           TaxAmount = taxAmount
-          DiscountAmount = discountAmount }
+          DiscountAmount = discountAmount
+          AdditionalCostsResult = totalAdditionalCosts }
 
 
 
