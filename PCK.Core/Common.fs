@@ -40,6 +40,10 @@ module Common =
         Description : string
         Ammount : DecimalTwoDigits
     }
+    
+    type CombiningDiscountsMethod =
+    | Additive
+    | Multiplicative
 
     type Result = {
         CalculatedPrice : DecimalTwoDigits
@@ -67,33 +71,51 @@ module Common =
                             Ammount = DecimalTwoDigits.create (priceValue * p / 100M)
                           }
 
-    let calculate : Product -> Tax -> Discount -> Discount -> AdditionalCost list -> Result =
-        fun product tax discount upcDiscount additionalCosts ->
+    let private matchDiscountApplyRuleBefore : Discount -> bool =
+        fun discount ->
+        match discount with
+        | NoDiscount -> false
+        | Discount d ->
+            match d.ApplyRule with 
+            | Before -> true
+            | After -> false
+
+    let private matchDiscountApplyRuleAfter : Discount -> bool =
+        fun discount ->
+        match discount with
+        | NoDiscount -> false
+        | Discount d ->
+            match d.ApplyRule with 
+            | Before -> false
+            | After -> true
+
+    let private getPriceByCombiningDiscountsMethod : CombiningDiscountsMethod -> decimal -> decimal -> decimal =
+        fun combiningDiscountsMethod currentPrice currentDiscountValue ->
+        match combiningDiscountsMethod with
+                            | Additive -> currentPrice
+                            | Multiplicative -> currentPrice - currentDiscountValue
+
+    let calculate : Product -> Tax -> Discount -> Discount -> AdditionalCost list -> CombiningDiscountsMethod-> Result =
+        fun product (Tax tax) discount upcDiscount additionalCosts combiningDiscountsMethod ->
         let priceValue = DecimalTwoDigits.value product.Price
-        let (Tax taxV) = tax
-        let taxValue = DecimalTwoDigits.value taxV
-        let discountAmountRulesBefore = calculateDiscountAmount priceValue ([discount; upcDiscount] |> List.filter (fun disc -> 
-                                                                                                                        match disc with
-                                                                                                                        | NoDiscount -> false
-                                                                                                                        | Discount d ->
-                                                                                                                            match d.ApplyRule with 
-                                                                                                                            | Before -> true
-                                                                                                                            | After -> false))
+        let taxValue = DecimalTwoDigits.value tax
+
+        let beforeRuleDiscountAmmount = calculateDiscountAmount priceValue ([discount] |> List.filter matchDiscountApplyRuleBefore)
+        let beforeRuleUpcDiscountAmmount = calculateDiscountAmount (getPriceByCombiningDiscountsMethod combiningDiscountsMethod priceValue beforeRuleDiscountAmmount) ([upcDiscount] |> List.filter matchDiscountApplyRuleBefore)
+        let discountAmountRulesBefore = beforeRuleDiscountAmmount + beforeRuleUpcDiscountAmmount
         let currentPriceValue = priceValue - discountAmountRulesBefore
-        let discountAmountRulesAfter = calculateDiscountAmount currentPriceValue ([discount; upcDiscount] |> List.filter (fun disc -> 
-                                                                                                                        match disc with
-                                                                                                                        | NoDiscount -> false
-                                                                                                                        | Discount d ->
-                                                                                                                            match d.ApplyRule with 
-                                                                                                                            | Before -> false
-                                                                                                                            | After -> true))
+        
+        let afterRuleDiscountAmmount = calculateDiscountAmount currentPriceValue ([discount] |> List.filter matchDiscountApplyRuleAfter)
+        let afterRuleUpcDiscountAmmount = calculateDiscountAmount (getPriceByCombiningDiscountsMethod combiningDiscountsMethod currentPriceValue afterRuleDiscountAmmount) ([upcDiscount] |> List.filter matchDiscountApplyRuleAfter)
+        let discountAmountRulesAfter = afterRuleDiscountAmmount + afterRuleUpcDiscountAmmount
+
         let discountValue = discountAmountRulesBefore + discountAmountRulesAfter
         let taxAmountTD = DecimalTwoDigits.create(currentPriceValue * taxValue / 100M)
         let discountAmountTD = DecimalTwoDigits.create(discountValue)
         let taxAmount = DecimalTwoDigits.value taxAmountTD
         let discountAmount = DecimalTwoDigits.value discountAmountTD
         let totalAdditionalCosts = additionalCosts |> List.map(fun ac -> calculateAdditionalCost product.Price ac)
-        { CalculatedPrice = DecimalTwoDigits.create (priceValue + taxAmount - discountAmount + (totalAdditionalCosts |> List.sumBy(fun c -> DecimalTwoDigits.value c.Ammount)))
+        { CalculatedPrice = DecimalTwoDigits.create (priceValue + taxAmount - discountAmount + (totalAdditionalCosts |> List.sumBy(fun ac -> DecimalTwoDigits.value ac.Ammount)))
           TaxAmount = taxAmount
           DiscountAmount = discountAmount
           AdditionalCostsResult = totalAdditionalCosts }

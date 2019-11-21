@@ -17,7 +17,7 @@ namespace PCK.Application
                                                  Core.DecimalTwoDigits.create(20.25M)));
         }
 
-        public Result Execute(int id, decimal taxValue, List<AdditionalCost> additionalCosts)
+        public Result Execute(int id, decimal taxValue, List<AdditionalCost> additionalCosts, CombiningDiscountsMethod combiningDiscountsMethod)
         {
             var product = products.First(x => x.UPC.Item == id);
             Discount upcDiscount;
@@ -31,7 +31,8 @@ namespace PCK.Application
                                                                     Core.Common.Discount.NewDiscount(new Core.Common.DiscountValue(Core.DecimalTwoDigits.create(upcDiscount.Value), upcDiscount.Rule == DiscountRule.After ? Core.Common.DiscountApplyRule.After : Core.Common.DiscountApplyRule.Before)),
                                                 ListModule.OfSeq(additionalCosts.Select(ac => new Core.Common.AdditionalCost(ac.Description,
                                                                                                                                 ac.Type == AdditionalCostType.Absolute ? Core.Common.Ammount.NewAbsoluteValue(Core.DecimalTwoDigits.create(ac.Value)) :
-                                                                                                                                                                            Core.Common.Ammount.NewPercentage(ac.Value)))));
+                                                                                                                                                                            Core.Common.Ammount.NewPercentage(ac.Value)))),
+                                                combiningDiscountsMethod == CombiningDiscountsMethod.Additive ? Core.Common.CombiningDiscountsMethod.Additive : Core.Common.CombiningDiscountsMethod.Multiplicative);
 
             return new Result(Core.DecimalTwoDigits.value(product.Price), Core.DecimalTwoDigits.value(result.CalculatedPrice), taxValue, discount, result.TaxAmount, result.DiscountAmount, upcDiscount, result.AdditionalCostsResult.Select(ac => new AdditionalCostResult(ac.Description, Core.DecimalTwoDigits.value(ac.Ammount))));
         }
@@ -62,6 +63,12 @@ namespace PCK.Application
     {
         Absolute,
         Percentage
+    }
+
+    public enum CombiningDiscountsMethod
+    {
+        Additive,
+        Multiplicative
     }
 
     public class AdditionalCost
