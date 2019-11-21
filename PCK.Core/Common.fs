@@ -13,9 +13,18 @@ module Common =
         Price: DecimalTwoDigits
     }
 
+    type DiscountApplyRule =
+    | Before
+    | After
+
+    type DiscountValue ={
+        Value: DecimalTwoDigits
+        ApplyRule: DiscountApplyRule
+    }
+
     type Tax = Tax of DecimalTwoDigits
     type Discount =
-    | Discount of DecimalTwoDigits
+    | Discount of DiscountValue
     | NoDiscount
 
     type Result = {
@@ -24,21 +33,35 @@ module Common =
         DiscountAmount : decimal
     }
 
+    let private calculateDiscountAmount : decimal -> Discount list -> decimal = 
+        fun price discounts ->
+        discounts |> List.fold(fun result discount -> result + match discount with
+                                                                        | NoDiscount -> 0M
+                                                                        | Discount d -> DecimalTwoDigits.value d.Value * price / 100M) 0M
+
     let calculate : Product -> Tax -> Discount -> Discount -> Result =
         fun product tax discount upcDiscount ->
         let priceValue = DecimalTwoDigits.value product.Price
         let (Tax taxV) = tax
         let taxValue = DecimalTwoDigits.value taxV
-        let discountValue =
-            match discount with
-                | NoDiscount -> 0M
-                | Discount d -> DecimalTwoDigits.value d
-        let upcDiscountValue =
-            match upcDiscount with
-            | NoDiscount -> 0M
-            | Discount d -> DecimalTwoDigits.value d
-        let taxAmountTD = DecimalTwoDigits.create(priceValue * taxValue / 100M)
-        let discountAmountTD = DecimalTwoDigits.create(priceValue * discountValue / 100M + priceValue * upcDiscountValue / 100M)
+        let discountAmountRulesBefore = calculateDiscountAmount priceValue ([discount; upcDiscount] |> List.filter (fun disc -> 
+                                                                                                                        match disc with
+                                                                                                                        | NoDiscount -> false
+                                                                                                                        | Discount d ->
+                                                                                                                            match d.ApplyRule with 
+                                                                                                                            | Before -> true
+                                                                                                                            | After -> false))
+        let currentPriceValue = priceValue - discountAmountRulesBefore
+        let discountAmountRulesAfter = calculateDiscountAmount currentPriceValue ([discount; upcDiscount] |> List.filter (fun disc -> 
+                                                                                                                        match disc with
+                                                                                                                        | NoDiscount -> false
+                                                                                                                        | Discount d ->
+                                                                                                                            match d.ApplyRule with 
+                                                                                                                            | Before -> false
+                                                                                                                            | After -> true))
+        let discountValue = discountAmountRulesBefore + discountAmountRulesAfter
+        let taxAmountTD = DecimalTwoDigits.create(currentPriceValue * taxValue / 100M)
+        let discountAmountTD = DecimalTwoDigits.create(discountValue)
         let taxAmount = DecimalTwoDigits.value taxAmountTD
         let discountAmount = DecimalTwoDigits.value discountAmountTD
         { CalculatedPrice = DecimalTwoDigits.create (priceValue + taxAmount - discountAmount)

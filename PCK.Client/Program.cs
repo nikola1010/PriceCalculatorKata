@@ -9,16 +9,11 @@ namespace PCK.Client
         {
             BasicUseCase buc = new BasicUseCase();
 
-            buc.SetDiscount(15);
-            buc.SetUPCDiscount(12345, 7);
+            buc.SetDiscount(new Discount(15, DiscountRule.After));
+            buc.SetUPCDiscount(12345, new Discount(7, DiscountRule.Before));
             var result = buc.Execute(12345, 20M);
 
-            buc.ClearAllUPCDiscounts();
-            buc.SetUPCDiscount(789, 7);
-            var result2 = buc.Execute(12345, 21M);
-
             Console.WriteLine(result);
-            Console.WriteLine(result2);
 
             Console.ReadKey();
         }
