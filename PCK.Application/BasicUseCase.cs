@@ -17,10 +17,6 @@ namespace PCK.Application
             products.Add(new Core.Common.Product(Core.Common.UPC.NewUPC(12345),
                                                  Core.Common.Name.NewName("The Little Prince"),
                                                  new Core.Common.Price(Core.DecimalTwoDigits.create(20.25M), Core.Common.Currency.NewCurrency("USD"))));
-
-            products.Add(new Core.Common.Product(Core.Common.UPC.NewUPC(123),
-                                                 Core.Common.Name.NewName("Mali Princ"),
-                                                 new Core.Common.Price(Core.DecimalTwoDigits.create(20.25M), Core.Common.Currency.NewCurrency("RSD"))));
         }
 
         public Result Execute(int id, decimal taxValue, List<AdditionalCost> additionalCosts, CombiningDiscountsMethod combiningDiscountsMethod)
