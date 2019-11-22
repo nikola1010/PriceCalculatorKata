@@ -2,7 +2,9 @@
 
 module Common =
 
+    open System
     open DecimalTwoDigits
+    open DecimalFourDigits
     
     type UPC = UPC of int
     type Name = Name of string
@@ -10,7 +12,7 @@ module Common =
     type Currency = Currency of string
 
     type Price = {
-        Value: DecimalTwoDigits
+        Value: DecimalFourDigits
         Currency: Currency
     }
 
@@ -42,10 +44,15 @@ module Common =
         Description : string
         Ammount : Ammount
     }
+    
+    type ResultPrice = {
+        Value: DecimalTwoDigits
+        Currency: Currency
+    }
 
     type AdditionalCostResult = {
         Description : string
-        Ammount : Price
+        Ammount : ResultPrice
     }
     
     type CombiningDiscountsMethod =
@@ -55,6 +62,7 @@ module Common =
     type DiscountCap =
     | AbsoluteValueCup of Price
     | PercentageCup of decimal
+    | NoDiscountCap
     
     type ValidationError = {
         Name : string
@@ -62,9 +70,10 @@ module Common =
     }
 
     type Result = {
-        CalculatedPrice : Price
-        TaxAmount : decimal
-        DiscountAmount : decimal
+        InitialPrice : ResultPrice
+        CalculatedPrice : ResultPrice
+        TaxAmount : ResultPrice
+        DiscountAmount : ResultPrice
         AdditionalCostsResult : AdditionalCostResult list
     }
 
@@ -77,16 +86,12 @@ module Common =
     let private calculateAdditionalCost : Price -> AdditionalCost -> AdditionalCostResult =
         fun prpductPrice additionalCost ->
         match additionalCost.Ammount with
-        | AbsoluteValue av -> {
-                                Description = additionalCost.Description
-                                Ammount = av
-                              }
-        | Percentage p -> let priceValue = DecimalTwoDigits.value prpductPrice.Value
-                          {
-                            Description = additionalCost.Description
-                            Ammount = { Value = DecimalTwoDigits.create (priceValue * p / 100M)
-                                        Currency = prpductPrice.Currency }
-                          }
+        | AbsoluteValue av -> { Description = additionalCost.Description
+                                Ammount = { Value = DecimalTwoDigits.create (DecimalFourDigits.value av.Value)
+                                            Currency = av.Currency } }
+        | Percentage p -> { Description = additionalCost.Description
+                            Ammount = { Value = DecimalTwoDigits.create ((DecimalFourDigits.value prpductPrice.Value) * p / 100M)
+                                        Currency = prpductPrice.Currency } }
 
     let private matchDiscountApplyRuleBefore : Discount -> bool =
         fun discount ->
@@ -114,7 +119,7 @@ module Common =
 
     let private calculateValid : Product -> Tax -> Discount -> Discount -> AdditionalCost list -> CombiningDiscountsMethod -> DiscountCap -> Result =
         fun product (Tax taxValue) discount upcDiscount additionalCosts combiningDiscountsMethod discountCap ->
-        let priceValue = DecimalTwoDigits.value product.Price.Value
+        let priceValue = DecimalFourDigits.value product.Price.Value
 
         let beforeRuleDiscountAmmount = calculateDiscountAmount priceValue ([discount] |> List.filter matchDiscountApplyRuleBefore)
         let beforeRuleUpcDiscountAmmount = calculateDiscountAmount (getPriceByCombiningDiscountsMethod combiningDiscountsMethod priceValue beforeRuleDiscountAmmount) ([upcDiscount] |> List.filter matchDiscountApplyRuleBefore)
@@ -126,21 +131,26 @@ module Common =
         let discountAmountRulesAfter = afterRuleDiscountAmmount + afterRuleUpcDiscountAmmount
 
         let discountValue = discountAmountRulesBefore + discountAmountRulesAfter
-        let taxAmountTD = DecimalTwoDigits.create(currentPriceValue * taxValue / 100M)
+        let taxAmountTD = DecimalFourDigits.create(currentPriceValue * taxValue / 100M)
          
         let discountCapValue = 
             match discountCap with
+            | NoDiscountCap -> Decimal.MaxValue
             | PercentageCup pc -> pc * priceValue / 100M
-            | AbsoluteValueCup avc -> DecimalTwoDigits.value avc.Value
+            | AbsoluteValueCup avc -> DecimalFourDigits.value avc.Value
         
-        let discountAmountTD = DecimalTwoDigits.create(min discountValue discountCapValue)
-        let taxAmount = DecimalTwoDigits.value taxAmountTD
-        let discountAmount = DecimalTwoDigits.value discountAmountTD
+        let discountAmountTD = DecimalFourDigits.create(min discountValue discountCapValue)
+        let taxAmount = DecimalFourDigits.value taxAmountTD
+        let discountAmount = DecimalFourDigits.value discountAmountTD
         let totalAdditionalCosts = additionalCosts |> List.map(fun ac -> calculateAdditionalCost product.Price ac)
-        { CalculatedPrice = { Value = DecimalTwoDigits.create (priceValue + taxAmount - discountAmount + (totalAdditionalCosts |> List.sumBy(fun ac -> DecimalTwoDigits.value ac.Ammount.Value)))
+        { InitialPrice = { Value = DecimalTwoDigits.create priceValue
+                           Currency = product.Price.Currency}
+          CalculatedPrice = { Value = DecimalTwoDigits.create (priceValue + taxAmount - discountAmount + (totalAdditionalCosts |> List.sumBy(fun ac -> DecimalTwoDigits.value ac.Ammount.Value)))
                               Currency = product.Price.Currency }
-          TaxAmount = taxAmount
-          DiscountAmount = discountAmount
+          TaxAmount = { Value = DecimalTwoDigits.create taxAmount
+                        Currency = product.Price.Currency }
+          DiscountAmount = { Value = DecimalTwoDigits.create discountAmount
+                             Currency = product.Price.Currency }
           AdditionalCostsResult = totalAdditionalCosts }
 
     let private validateAdditionalCosts: Product -> AdditionalCost list -> ValidationError list -> ValidationError list =
@@ -155,6 +165,7 @@ module Common =
     let private validateDiscountCap: Product -> DiscountCap -> ValidationError list -> ValidationError list =
         fun product discountCap validationErrors ->
             match discountCap with
+            | NoDiscountCap -> validationErrors
             | PercentageCup _ -> validationErrors
             | AbsoluteValueCup avc -> if (avc.Currency = product.Price.Currency) then
                                         validationErrors

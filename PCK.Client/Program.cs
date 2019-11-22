@@ -1,6 +1,5 @@
 ﻿using PCK.Application;
 using System;
-using System.Collections.Generic;
 
 namespace PCK.Client
 {
@@ -12,11 +11,13 @@ namespace PCK.Client
             {
                 BasicUseCase buc = new BasicUseCase();
 
+                buc.SetTax(21M);
                 buc.SetDiscount(new Discount(15, DiscountRule.After));
                 buc.SetUPCDiscount(12345, new Discount(7, DiscountRule.After));
-                buc.SetDiscountCup(new DiscountCup(DiscountCupType.Percentage, 100, ""));
-                var additionalCosts = new List<AdditionalCost>() { new AdditionalCost("Transport", AdditionalCostType.Percentage, 3M, "") };
-                var result = buc.Execute(12345, 21M, additionalCosts, CombiningDiscountsMethod.Multiplicative);
+                buc.SetCombiningDiscountsMethod(CombiningDiscountsMethod.Multiplicative);
+                buc.AddAdditionalCost(new AdditionalCost("Transport", AdditionalCostType.Percentage, 3M, ""));
+
+                var result = buc.Execute(12345);
 
                 Console.WriteLine(result);
             }

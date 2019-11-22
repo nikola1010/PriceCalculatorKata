@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <Compile Include="DecimalTwoDigits.fs" />
+    <Compile Include="DecimalFourDigits.fs" />
     <Compile Include="Common.fs" />
   </ItemGroup>
 

@@ -11,45 +11,47 @@ namespace PCK.Application
         private Discount discount;
         private Dictionary<int, Discount> productUpcDiscounts = new Dictionary<int, Discount>();
         private DiscountCup discountCup;
+        private decimal tax;
+        private CombiningDiscountsMethod combiningDiscountsMethod;
+        private List<AdditionalCost> additionalCosts = new List<AdditionalCost>();
 
         public BasicUseCase()
         {
             products.Add(new Core.Common.Product(Core.Common.UPC.NewUPC(12345),
                                                  Core.Common.Name.NewName("The Little Prince"),
-                                                 new Core.Common.Price(Core.DecimalTwoDigits.create(20.25M), Core.Common.Currency.NewCurrency("USD"))));
+                                                 new Core.Common.Price(Core.DecimalFourDigits.create(20.25M), Core.Common.Currency.NewCurrency("USD"))));
         }
 
-        public Result Execute(int id, decimal taxValue, List<AdditionalCost> additionalCosts, CombiningDiscountsMethod combiningDiscountsMethod)
+        public Result Execute(int id)
         {
-            if (discountCup == null) throw new ArgumentNullException(nameof(discountCup));
-
             var product = products.First(x => x.UPC.Item == id);
             Discount upcDiscount;
             productUpcDiscounts.TryGetValue(id, out upcDiscount);
 
             var result = Core.Common.calculate(product,
-                                                Core.Common.Tax.NewTax(taxValue),
+                                                Core.Common.Tax.NewTax(tax),
                                                 discount == null ? Core.Common.Discount.NoDiscount :
                                                                 Core.Common.Discount.NewDiscount(new Core.Common.DiscountValue(discount.Value, discount.Rule == DiscountRule.After ? Core.Common.DiscountApplyRule.After : Core.Common.DiscountApplyRule.Before)),
                                                 upcDiscount == null ? Core.Common.Discount.NoDiscount :
                                                                     Core.Common.Discount.NewDiscount(new Core.Common.DiscountValue(upcDiscount.Value, upcDiscount.Rule == DiscountRule.After ? Core.Common.DiscountApplyRule.After : Core.Common.DiscountApplyRule.Before)),
                                                 ListModule.OfSeq(additionalCosts.Select(ac => new Core.Common.AdditionalCost(ac.Description,
-                                                                                                                                ac.Type == AdditionalCostType.Absolute ? Core.Common.Ammount.NewAbsoluteValue(new Core.Common.Price(Core.DecimalTwoDigits.create(ac.Value), Core.Common.Currency.NewCurrency(ac.Currency))) :
+                                                                                                                                ac.Type == AdditionalCostType.Absolute ? Core.Common.Ammount.NewAbsoluteValue(new Core.Common.Price(Core.DecimalFourDigits.create(ac.Value), Core.Common.Currency.NewCurrency(ac.Currency))) :
                                                                                                                                                                             Core.Common.Ammount.NewPercentage(ac.Value)))),
                                                 combiningDiscountsMethod == CombiningDiscountsMethod.Additive ? Core.Common.CombiningDiscountsMethod.Additive : Core.Common.CombiningDiscountsMethod.Multiplicative,
-                                                discountCup.Type == DiscountCupType.Absolute ? Core.Common.DiscountCap.NewAbsoluteValueCup(new Core.Common.Price(Core.DecimalTwoDigits.create(discountCup.Value), Core.Common.Currency.NewCurrency(discountCup.Currency))) :
-                                                                                                            Core.Common.DiscountCap.NewPercentageCup(discountCup.Value));
+                                                discountCup == null ? Core.Common.DiscountCap.NoDiscountCap :
+                                                                        discountCup.Type == DiscountCupType.Absolute ? Core.Common.DiscountCap.NewAbsoluteValueCup(new Core.Common.Price(Core.DecimalFourDigits.create(discountCup.Value), Core.Common.Currency.NewCurrency(discountCup.Currency))) :
+                                                                                                                        Core.Common.DiscountCap.NewPercentageCup(discountCup.Value));
 
             if (result.IsOk)
             {
-                return new Result(new Price(Core.DecimalTwoDigits.value(product.Price.Value), product.Price.Currency.Item),
-                                    Core.DecimalTwoDigits.value(result.ResultValue.CalculatedPrice.Value),
-                                    taxValue,
+                return new Result(new Price(Core.DecimalTwoDigits.value(result.ResultValue.InitialPrice.Value), result.ResultValue.InitialPrice.Currency.Item),
+                                    new Price(Core.DecimalTwoDigits.value(result.ResultValue.CalculatedPrice.Value), result.ResultValue.CalculatedPrice.Currency.Item),
+                                    tax,
                                     discount,
-                                    result.ResultValue.TaxAmount,
-                                    result.ResultValue.DiscountAmount,
+                                    new Price(Core.DecimalTwoDigits.value(result.ResultValue.TaxAmount.Value), result.ResultValue.TaxAmount.Currency.Item),
+                                    new Price(Core.DecimalTwoDigits.value(result.ResultValue.DiscountAmount.Value), result.ResultValue.DiscountAmount.Currency.Item),
                                     upcDiscount,
-                                    result.ResultValue.AdditionalCostsResult.Select(ac => new AdditionalCostResult(ac.Description, Core.DecimalTwoDigits.value(ac.Ammount.Value))));
+                                    result.ResultValue.AdditionalCostsResult.Select(ac => new AdditionalCostResult(ac.Description, Core.DecimalTwoDigits.value(ac.Ammount.Value), ac.Ammount.Currency.Item)));
             }
             else
             {
@@ -57,25 +59,23 @@ namespace PCK.Application
             }
         }
 
-        public void SetDiscountCup(DiscountCup discountCup)
-        {
-            this.discountCup = discountCup;
-        }
+        public void AddAdditionalCost(AdditionalCost additionalCost) => additionalCosts.Add(additionalCost);
 
-        public void SetDiscount(Discount discount)
-        {
-            this.discount = discount;
-        }
+        public void ClearAddAdditionalCosts() => additionalCosts = new List<AdditionalCost>();
 
-        public void SetUPCDiscount(int ucd, Discount discount)
-        {
-            productUpcDiscounts.Add(ucd, discount);
-        }
+        public void SetCombiningDiscountsMethod(CombiningDiscountsMethod combiningDiscountsMethod) => this.combiningDiscountsMethod = combiningDiscountsMethod;
 
-        public void ClearAllUPCDiscounts()
-        {
-            productUpcDiscounts = new Dictionary<int, Discount>();
-        }
+        public void SetTax(decimal tax) => this.tax = tax;
+
+        public void SetDiscountCup(DiscountCup discountCup) => this.discountCup = discountCup;
+
+        public void ClearDiscountCup() => discountCup = null;
+
+        public void SetDiscount(Discount discount) => this.discount = discount;
+
+        public void SetUPCDiscount(int ucd, Discount discount) => productUpcDiscounts.Add(ucd, discount);
+
+        public void ClearAllUPCDiscounts() => productUpcDiscounts = new Dictionary<int, Discount>();
     }
 
     public enum DiscountRule
@@ -146,14 +146,16 @@ namespace PCK.Application
 
     public class AdditionalCostResult
     {
-        public AdditionalCostResult(string description, decimal value)
+        public AdditionalCostResult(string description, decimal value, string currency)
         {
             Description = description;
             Value = value;
+            Currency = currency;
         }
 
         public string Description { get; }
         public decimal Value { get; }
+        public string Currency { get; }
     }
 
     public class Discount
@@ -170,36 +172,38 @@ namespace PCK.Application
 
     public class Result
     {
-        public Result(Price initPrice, decimal calculatedPrice, decimal taxValue, Discount discountValue, decimal taxValueAmount, decimal discountValueAmount, Discount upcDiscountValue, IEnumerable<AdditionalCostResult> additionalCosts)
+        public Result(Price initPrice, Price calculatedPrice, decimal tax, Discount discountValue, Price taxAmount, Price discountValueAmount, Discount upcDiscountValue, IEnumerable<AdditionalCostResult> additionalCosts)
         {
             InitPrice = initPrice;
             CalculatedPrice = calculatedPrice;
-            TaxValue = taxValue;
+            Tax = tax;
             DiscountValue = discountValue;
-            TaxValueAmount = taxValueAmount;
+            TaxAmount = taxAmount;
             DiscountValueAmount = discountValueAmount;
             UpcDiscountValue = upcDiscountValue;
             AdditionalCosts = additionalCosts;
         }
 
         public Price InitPrice { get; }
-        public decimal CalculatedPrice { get; }
-        public decimal TaxValue { get; }
+        public Price CalculatedPrice { get; }
+        public decimal Tax { get; }
         public Discount DiscountValue { get; }
-        public decimal TaxValueAmount { get; }
-        public decimal DiscountValueAmount { get; }
+        public Price TaxAmount { get; }
+        public Price DiscountValueAmount { get; }
         public Discount UpcDiscountValue { get; }
         public IEnumerable<AdditionalCostResult> AdditionalCosts { get; }
 
         public override string ToString()
         {
+            var decimalOutputFormat = "0.00";
+
             var discountValueText = string.Empty;
             var discountAmountText = string.Empty;
 
             if (DiscountValue != null)
             {
                 discountValueText = $" and {DiscountValue.Value} % ({DiscountValue.Rule}) discount";
-                discountAmountText = $", discount amount: {DiscountValueAmount.ToString("0.00")} {InitPrice.Currency}";
+                discountAmountText = $", discount amount: {DiscountValueAmount.Value.ToString(decimalOutputFormat)} {DiscountValueAmount.Currency}";
             }
 
             if (UpcDiscountValue != null)
@@ -207,7 +211,7 @@ namespace PCK.Application
                 discountValueText += $" and {UpcDiscountValue.Value} % ({UpcDiscountValue.Rule}) UPC discount";
             }
 
-            return $"Product price reported as {InitPrice.Value} {InitPrice.Currency} before tax and {CalculatedPrice.ToString("0.00")} {InitPrice.Currency} after {TaxValue} % tax{discountValueText}. Tax amount: {TaxValueAmount} {InitPrice.Currency}{discountAmountText}.\n{string.Join("\n", AdditionalCosts.Select(x => $"{x.Description} - {x.Value} {InitPrice.Currency}"))}";
+            return $"Product price reported as {InitPrice.Value} {InitPrice.Currency} before tax and {CalculatedPrice.Value.ToString(decimalOutputFormat)} {CalculatedPrice.Currency} after {Tax} % tax{discountValueText}. Tax amount: {TaxAmount.Value.ToString(decimalOutputFormat)} {TaxAmount.Currency}{discountAmountText}.\n{string.Join("\n", AdditionalCosts.Select(x => $"{x.Description} - {x.Value.ToString(decimalOutputFormat)} {x.Currency}"))}";
         }
     }
 }
